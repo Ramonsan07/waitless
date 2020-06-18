@@ -1,0 +1,22 @@
+{%extends "layout.html"%}
+
+{%block title%}
+    map
+{%endblock%}
+
+{% block custom_css %}
+    <link rel="stylesheet" href="/static/map.css">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.css">
+
+{% endblock %}
+
+{% block custom_js %}
+
+    <script src="https://maps.googleapis.com/maps/api/js?key={{ key | urlencode }}&v=3.exp"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.bundle.js"></script>
+
+    <script src="/static/script.js"></script>
+
+{% endblock %}

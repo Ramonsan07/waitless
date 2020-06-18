@@ -1,0 +1,33 @@
+{%extends "layout.html"%}
+
+{%block title%}
+    Login
+{%endblock%}
+
+
+{%block custom_css%}
+    <link rel="stylesheet" href="/static/loginEndSignin.css">
+{%endblock%}
+
+{% block main %}
+
+<div class="card bg-light mb-3 mx-auto mt-4" style="max-width: 18rem;">
+    <div class="card-header mx-auto">Login</div>
+        <div class="card-body">
+            <form id="login" action="/login" method="POST">
+                <div class="form-group">
+                    <input autocomplete="off" autofocus class="form-control" name="username" placeholder="Username" type="text"/>
+                </div>
+                <div class="form-group">
+                    <input class="form-control" name="password" placeholder="Password" type="password"/>
+                </div>
+                <div>
+                    <button id="login_btn" class="btn btn-primary" type="submit">Log In</button>
+                </div>
+                <p class="mt-4 text-sm"><a href="/changepassword">¿Olvidaste tu contraseña?</a></p>
+                <p class="text-sm"><a href="/signin">¿no tienes una cuenta?</a></p>
+            </form>
+        </div>
+</div>
+
+{% endblock %}
