@@ -1,4 +1,4 @@
-from flask import Flask, session, render_template, request, url_for, redirect, jsonify
+from flask import Flask, session, render_template, request, url_for, redirect, jsonify, flash
 from markupsafe import escape
 from helpers import loged_in
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -9,12 +9,20 @@ app = Flask(__name__)
 
 db = SQL("sqlite:///waitless.db")
 
-
 cookie_key = escape("b&#\\39;\\xd8c\\xb2C!.\\xbf\&#39;\\xfe[\\xd3 \\xb9\\x8b\\xe6\\x08K\\xde\\x068\\x98\\xfbO\\x05t\\x94R\\xbe\\x19&amp;V&#39;")
 app.secret_key = cookie_key
 
+
+@app.route('/about', methods=["GET"])
+def about():
+    session.clear()
+    return render_template('about.html')
+
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    
     if request.method == "GET":
         session.clear()
         return render_template("login.html")
@@ -31,7 +39,7 @@ def login():
         if len(user) != 1 or not check_password_hash(user[0]["user_password"], password):
             return "usuario o contraseña incorrectos", 400
 
-        # remember user.
+        # darle cookie al user para recordarlo.
         session["user_id"] = user[0]["user_id"]
 
         return redirect(url_for("index"))
@@ -73,13 +81,15 @@ def signin():
 @app.route('/')
 @loged_in
 def index():
-    return render_template("index.html", key='')
+    """retorna el la pagina principal si esta logueadom, sino retorna la landing page"""
+    return render_template("index.html", key='', user=True)
 
 @app.route('/update')
 @loged_in
 def update():
-
-    #latitudes y logitudes que describen la pantalla que esta viendo el usuario.
+    """devuelve las coordenadas de las barberias a la vista del usuario con diferenciacion entre favoritas y normales"""
+    
+    # latitudes y logitudes que describen la pantalla que esta viendo el usuario.
     ne_lat, ne_lng, sw_lat, sw_lng = request.args.get("nelat"), request.args.get("nelgn"), request.args.get("swlat"), request.args.get("swlgn")
 
 
@@ -113,34 +123,39 @@ def update():
                                        AND p_barbershop_lng >= :sw_lng AND p_barbershop_lng <= :ne_lng""",
                                        user_id=user_id, ne_lat=ne_lat, ne_lng=ne_lng, sw_lat=sw_lat, sw_lng=sw_lng)
 
-    # union de los dos tipos de barberia con un campo mas (f_b) para pintarlas diferentes
+    # union de los dos tipos de barberia con un campo mas en f_b para pintarlas diferentes
     return jsonify(barbershops + favourite_barbershops)
 
 
 @app.route('/infobarbershop/<int:barbershop_id>', methods=["GET", "POST"])
 @loged_in
 def info_barbershop(barbershop_id):
-
-    # tres ultimos registros de la concurrencia de una barberia.
+    """devuelve informacion sobre la barberia seleccionada"""
+    # seis ultimos registros de la concurrencia de una barberia.
     barbershop_concurrency_info = db.execute("""SELECT c_h_barbershop_concurrency AS concurrency,
-                             date(c_h_barbershop_time) AS date, time(c_h_barbershop_time) AS time
+                             c_h_barbershop_time AS date
                              FROM place_barbershop inner join concurrency_history_barbershop
                              ON (c_h_barbershop_place_barbershop = p_barbershop_id )
                              WHERE c_h_barbershop_place_barbershop = :barbershop_id
-                             ORDER BY c_h_barbershop_time DESC LIMIT 3""", barbershop_id=barbershop_id)
+                             ORDER BY c_h_barbershop_time DESC LIMIT 6""", barbershop_id=barbershop_id)
 
     #direccion de la barberia.
     barbershop_direccion_info = db.execute("""SELECT p_barbershop_direccion AS direccion from place_barbershop
                                            WHERE p_barbershop_id = :barbershop_id""", barbershop_id = barbershop_id)
 
+    # revisando que la barberia sea favorita del usuario. Esto es necesario por si pensas que no.
+    is_liked = bool(db.execute("""SELECT f_p_barbershop FROM favourite_place_barbershop
+                          WHERE f_p_barbershop_cod = :cod""", cod="{0}{1}".format(session["user_id"], barbershop_id)))
+
     # construyendo el objeto de respuesta.
-    barbershop_info = {"concurrency": barbershop_concurrency_info, "direccion": barbershop_direccion_info[0]["direccion"]}
+    barbershop_info = {"concurrency": barbershop_concurrency_info, "direccion": barbershop_direccion_info[0]["direccion"], "is_liked": is_liked}
 
     return jsonify(barbershop_info)
 
 @app.route('/like/<int:barbershop_id>', methods=["DELETE", "POST"])
 @loged_in
 def like(barbershop_id):
+    """setea una barberia como favorita de un usuatio especifico"""
 
     if request.method == "POST":
 
@@ -163,11 +178,13 @@ def like(barbershop_id):
 @app.route("/concurrency/<int:barbershop_id>", methods=["POST"])
 @loged_in
 def concurrency(barbershop_id):
+    """actualiza el valor de la concurrencia de una barbera especifica para una barberia especifica selecciomada por el usuario"""
 
-    concurrecy = request.form.get("concurrency")
-    return "algo", 200
+    concurrency_value = request.form.get("concurrency")
 
+    db.execute(""" INSERT INTO concurrency_history_barbershop(c_h_barbershop_place_barbershop, c_h_barbershop_user, c_h_barbershop_time, c_h_barbershop_concurrency)
+               values(:barbershop_id, :user_id, julianday('now'), :concurrency)""", barbershop_id=barbershop_id, user_id=session["user_id"], concurrency=concurrency_value)
 
-
+    return "ok", 200
 
 
