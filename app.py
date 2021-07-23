@@ -2,7 +2,7 @@ from flask import Flask, session, render_template, request, url_for, redirect, j
 from markupsafe import escape
 from helpers import loged_in
 from werkzeug.security import check_password_hash, generate_password_hash
-from datetime import date
+#entrando en conflicto
 
 from cs50 import SQL
 
