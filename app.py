@@ -2,14 +2,10 @@ from flask import Flask, session, render_template, request, url_for, redirect, j
 from markupsafe import escape
 from helpers import loged_in
 from werkzeug.security import check_password_hash, generate_password_hash
-<<<<<<< HEAD
 #entrando en conflicto 006
-=======
-#entrando en conflicto 007
->>>>>>> 4b8aaefc1336d63b5b3392b6d212a0921051cd6d
 
 from cs50 import SQL
-
+#esto se va
 app = Flask(__name__)
 
 db = SQL("sqlite:///waitless.db")
