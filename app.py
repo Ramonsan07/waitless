@@ -3,6 +3,7 @@ from markupsafe import escape
 from helpers import loged_in
 from werkzeug.security import check_password_hash, generate_password_hash
 from cs50 import SQL
+#001
 
 #esto se va lo antes posible. 
 app = Flask(__name__)
