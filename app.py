@@ -2,12 +2,14 @@ from flask import Flask, session, render_template, request, url_for, redirect, j
 from markupsafe import escape
 from helpers import loged_in
 from werkzeug.security import check_password_hash, generate_password_hash
+from datetime import date
 
 from cs50 import SQL
 
 app = Flask(__name__)
 
 db = SQL("sqlite:///waitless.db")
+
 
 cookie_key = escape("b&#\\39;\\xd8c\\xb2C!.\\xbf\&#39;\\xfe[\\xd3 \\xb9\\x8b\\xe6\\x08K\\xde\\x068\\x98\\xfbO\\x05t\\x94R\\xbe\\x19&amp;V&#39;")
 app.secret_key = cookie_key
@@ -22,7 +24,6 @@ def about():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    
     if request.method == "GET":
         session.clear()
         return render_template("login.html")
@@ -81,15 +82,13 @@ def signin():
 @app.route('/')
 @loged_in
 def index():
-    """retorna el la pagina principal si esta logueadom, sino retorna la landing page"""
-    return render_template("index.html", key='', user=True)
+    return render_template("index.html", key='AIzaSyAoXq9RX6z2YVaWBKbg9aiFlp_SDeBYZCI', user=True)
 
 @app.route('/update')
 @loged_in
 def update():
-    """devuelve las coordenadas de las barberias a la vista del usuario con diferenciacion entre favoritas y normales"""
-    
-    # latitudes y logitudes que describen la pantalla que esta viendo el usuario.
+
+    #latitudes y logitudes que describen la pantalla que esta viendo el usuario.
     ne_lat, ne_lng, sw_lat, sw_lng = request.args.get("nelat"), request.args.get("nelgn"), request.args.get("swlat"), request.args.get("swlgn")
 
 
@@ -97,7 +96,6 @@ def update():
 
     # TODO: hacerle un order by rating para que te salgan las barberias mas relevantes.
     # seleccionando todas las barberias en la vista del mapa que no son las favoritas del usuario.
-    # el error de esta query me va a matar. casi me volvio mas loco.
     barbershops = db.execute("""SELECT p_barbershop_lat AS lat, p_barbershop_lng AS lng, p_barbershop_id AS id,
                              p_barbershop_name AS name
                              FROM place_barbershop LEFT JOIN favourite_place_barbershop
@@ -130,8 +128,11 @@ def update():
 @app.route('/infobarbershop/<int:barbershop_id>', methods=["GET", "POST"])
 @loged_in
 def info_barbershop(barbershop_id):
-    """devuelve informacion sobre la barberia seleccionada"""
-    # seis ultimos registros de la concurrencia de una barberia.
+
+    Barbershop_rating = db.execute("""SELECT avg(r_p_barbershop_rating) AS rating FROM rating_place_barbershop
+                                   where r_p_barbershop_place = :barbershop""", barbershop=barbershop_id)
+
+    # 6 ultimos registros de la concurrencia de una barberia.
     barbershop_concurrency_info = db.execute("""SELECT c_h_barbershop_concurrency AS concurrency,
                              c_h_barbershop_time AS date
                              FROM place_barbershop inner join concurrency_history_barbershop
@@ -148,17 +149,21 @@ def info_barbershop(barbershop_id):
                           WHERE f_p_barbershop_cod = :cod""", cod="{0}{1}".format(session["user_id"], barbershop_id)))
 
     # construyendo el objeto de respuesta.
-    barbershop_info = {"concurrency": barbershop_concurrency_info, "direccion": barbershop_direccion_info[0]["direccion"], "is_liked": is_liked}
+    barbershop_info = {"concurrency": barbershop_concurrency_info,
+                        "direccion": barbershop_direccion_info[0]["direccion"],
+                        "is_liked": is_liked,
+                        "rating": Barbershop_rating
+
+                      }
 
     return jsonify(barbershop_info)
 
 @app.route('/like/<int:barbershop_id>', methods=["DELETE", "POST"])
 @loged_in
 def like(barbershop_id):
-    """setea una barberia como favorita de un usuatio especifico"""
 
     if request.method == "POST":
-
+        # que pobresa ese SQL. Me doy pena. Ya se como hacerlo bien almenos.
         try:
             db.execute("""INSERT INTO favourite_place_barbershop (f_p_barbershop_user, f_p_barbershop_place, f_p_barbershop_cod)
                        VALUES(:user_id, :barbershop_id, :barbershop_cod)""", user_id=session["user_id"], barbershop_id=barbershop_id, barbershop_cod="{0}{1}".format(session["user_id"], barbershop_id))
@@ -178,7 +183,6 @@ def like(barbershop_id):
 @app.route("/concurrency/<int:barbershop_id>", methods=["POST"])
 @loged_in
 def concurrency(barbershop_id):
-    """actualiza el valor de la concurrencia de una barbera especifica para una barberia especifica selecciomada por el usuario"""
 
     concurrency_value = request.form.get("concurrency")
 
@@ -188,3 +192,33 @@ def concurrency(barbershop_id):
     return "ok", 200
 
 
+@app.route("/ratingbarbershop/<int:barbershop_id>/<int:barbershop_rating>", methods=["POST"])
+@loged_in
+def ratingbarbershop(barbershop_id, barbershop_rating):
+    if request.method == "POST":
+
+        #tenes que ver el formato en el que va ese date now y el de sql lite para que la mierda sirva: Ya sirve la mierda.
+
+        #Hay dos formas de insertar estos ratings en la base de datos: Un partial Unique index o chequias si existe el registro de ese usuario dandole rating a
+        #esa barberia y lo actualizas, sino, obvio lo insertas. Ni idea cual es mas eficiente.
+        #negativo. Lo que hay que hacer aqui es una composite key con los dos valores. r_p_barbershop_place, r_p_barbershop_user
+
+        #buscando si ya le dio rating el usuario a la barberia.
+        already_rated = db.execute("""select * from rating_place_barbershop
+                                   where r_p_barbershop_user = :user AND r_p_barbershop_place = :barbershop"""
+                                   , barbershop=barbershop_id, user=session["user_id"])
+        #si ya le dio rating actualizar el valor del rating
+        if  len(already_rated) == 1:
+            db.execute("""UPDATE rating_place_barbershop set r_p_barbershop_rating=:rating 
+                       where r_p_barbershop_user=:user AND r_p_barbershop_place=:barbershop"""
+                       , rating=barbershop_rating, user=session["user_id"], barbershop=barbershop_id)
+            return "ok", 200
+        #si no le ha dado rating insertar el nuevo registro con el rating.
+        else:
+            db.execute("""INSERT INTO rating_place_barbershop
+                       (r_p_barbershop_place, r_p_barbershop_user, r_p_barbershop_rating, r_p_barbershop_time)
+                       values(:barbershop, :user, :rating, julianday('now')) """, barbershop=barbershop_id, user=session["user_id"], rating=barbershop_rating)
+
+        return "ok", 200
+
+app.run(ssl_context='adhoc')
