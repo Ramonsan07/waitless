@@ -5,7 +5,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 #entrando en conflicto 006
 
 from cs50 import SQL
-#esto se va
+#esto se va 
 app = Flask(__name__)
 
 db = SQL("sqlite:///waitless.db")
