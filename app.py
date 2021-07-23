@@ -2,11 +2,8 @@ from flask import Flask, session, render_template, request, url_for, redirect, j
 from markupsafe import escape
 from helpers import loged_in
 from werkzeug.security import check_password_hash, generate_password_hash
-#entrando en conflicto 009
-
-
-
 from cs50 import SQL
+
 #esto se va lo antes posible. 
 app = Flask(__name__)
 
